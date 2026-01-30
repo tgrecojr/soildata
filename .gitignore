@@ -1,0 +1,39 @@
+# Environment
+.env
+.env.*
+.env.local
+!.env.example
+
+.python-version
+
+# Rust
+target/
+Cargo.lock
+
+# Dependencies
+node_modules/
+vendor/
+__pycache__/
+.venv/
+
+# Build outputs
+dist/
+build/
+*.pyc
+
+# Claude local files
+.claude/settings.local.json
+CLAUDE.local.md
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

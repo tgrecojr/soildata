@@ -1,0 +1,32 @@
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+target/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/
+
+# Claude
+.claude/
+CLAUDE.md
+CLAUDE.local.md
