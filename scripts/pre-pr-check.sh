@@ -37,8 +37,23 @@ else
 fi
 echo ""
 
-# Step 3: Run local tests (no database required)
-echo "3️⃣  Running local tests (no database)..."
+# Step 3: Security audit (optional - only if cargo-audit is installed)
+echo "3️⃣  Running security audit (cargo audit)..."
+if command -v cargo-audit &> /dev/null; then
+    if cargo audit; then
+        echo -e "${GREEN}✅ Security audit passed${NC}"
+    else
+        echo -e "${RED}❌ Security audit failed${NC}"
+        FAILED=1
+    fi
+else
+    echo -e "${GREEN}⚠️  cargo-audit not installed (optional - CI will check)${NC}"
+    echo "   To install: cargo install cargo-audit"
+fi
+echo ""
+
+# Step 4: Run local tests (no database required)
+echo "4️⃣  Running local tests (no database)..."
 if cargo test --lib && cargo test --test fetcher_integration_test; then
     echo -e "${GREEN}✅ Local tests passed${NC}"
 else
@@ -47,8 +62,8 @@ else
 fi
 echo ""
 
-# Step 4: Build check
-echo "4️⃣  Checking build..."
+# Step 5: Build check
+echo "5️⃣  Checking build..."
 if cargo build --release; then
     echo -e "${GREEN}✅ Build successful${NC}"
 else
