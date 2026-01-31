@@ -219,19 +219,22 @@ impl Scheduler {
             return Ok(0);
         }
 
-        // Extract unique stations and upsert them
-        let mut seen_stations = std::collections::HashSet::new();
+        // Extract unique stations and batch upsert them
+        let mut seen_stations = std::collections::HashMap::new();
         for obs in &observations {
-            if seen_stations.insert(obs.wbanno) {
-                let station = NewStation {
-                    wbanno: obs.wbanno,
-                    name: Some(file_info.station_name.clone()),
-                    state: file_info.state.clone(),
-                    latitude: None,
-                    longitude: None,
-                };
-                self.repository.upsert_station(station).await?;
-            }
+            seen_stations.entry(obs.wbanno).or_insert_with(|| NewStation {
+                wbanno: obs.wbanno,
+                name: Some(file_info.station_name.clone()),
+                state: file_info.state.clone(),
+                latitude: None,
+                longitude: None,
+            });
+        }
+
+        // Batch upsert all unique stations in one query
+        let stations: Vec<NewStation> = seen_stations.into_values().collect();
+        if !stations.is_empty() {
+            self.repository.batch_upsert_stations(&stations).await?;
         }
 
         // Create preliminary processed_file record to get file_id
