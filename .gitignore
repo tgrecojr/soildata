@@ -4,6 +4,10 @@
 .env.local
 !.env.example
 
+# Configuration
+config/config.yaml
+config.yaml
+
 .python-version
 
 # Rust

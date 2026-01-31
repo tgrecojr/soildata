@@ -45,17 +45,19 @@ async fn main() -> anyhow::Result<()> {
         .map_err(|e| {
             anyhow::anyhow!(
                 "Failed to connect to database: {}\n\n\
-                 Connection: {}@{}:{}/{}\n\n\
+                 Host: {}:{}\n\
+                 Database: {}\n\
+                 User: {}\n\n\
                  Common fixes:\n\
                  1. Ensure PostgreSQL is running\n\
                  2. Check username/password are correct (DB_USER, DB_PASSWORD)\n\
                  3. Verify database exists: createdb {}\n\
                  4. Check host and port (DB_HOST, DB_PORT)",
                 e,
-                config.database.user,
                 config.database.host,
                 config.database.port,
                 config.database.name,
+                config.database.user,
                 config.database.name
             )
         })?;
@@ -91,17 +93,21 @@ async fn main() -> anyhow::Result<()> {
 
 async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Failed to install Ctrl+C handler");
+        if let Err(e) = signal::ctrl_c().await {
+            error!("Failed to listen for Ctrl+C: {}", e);
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Failed to install signal handler")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => {
+                error!("Failed to install SIGTERM handler: {}", e);
+            }
+        }
     };
 
     #[cfg(not(unix))]
