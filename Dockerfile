@@ -44,6 +44,12 @@ FROM chef AS builder
 
 WORKDIR /app
 
+# Accept build args for CI optimization
+# In CI: CODEGEN_UNITS=16, LTO=false (faster builds, ~10% larger binary)
+# Local: uses Cargo.toml defaults (slower builds, smaller binary)
+ARG CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+ARG CARGO_PROFILE_RELEASE_LTO=thin
+
 # Install build dependencies
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && \
@@ -64,6 +70,7 @@ COPY src ./src
 COPY migrations ./migrations
 
 # Build the application with optimized release profile
+# Build args override Cargo.toml settings for faster CI builds
 RUN cargo build --release && \
     # Verify the binary works
     ls -lh /app/target/release/uscrn-ingest
