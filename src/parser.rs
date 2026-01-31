@@ -18,6 +18,12 @@ pub struct ParseStats {
     pub failure_rate: f64,
 }
 
+impl Default for ParseStats {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ParseStats {
     pub fn new() -> Self {
         Self {
@@ -249,21 +255,21 @@ fn parse_datetime(date: i32, time: i32) -> Result<chrono::DateTime<Utc>> {
     let minute = time % 100;
 
     // Validate ranges before creating date/time
-    if year < 1900 || year > 2100 {
+    if !(1900..=2100).contains(&year) {
         return Err(AppError::Parse(format!(
             "Year {} out of valid range (1900-2100) from date {}",
             year, date
         )));
     }
 
-    if month < 1 || month > 12 {
+    if !(1..=12).contains(&month) {
         return Err(AppError::Parse(format!(
             "Month {} out of valid range (1-12) from date {}",
             month, date
         )));
     }
 
-    if day < 1 || day > 31 {
+    if !(1..=31).contains(&day) {
         return Err(AppError::Parse(format!(
             "Day {} out of valid range (1-31) from date {}",
             day, date

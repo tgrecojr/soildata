@@ -186,7 +186,7 @@ impl Repository {
             debug!(
                 "Inserting batch {}/{} ({} observations)",
                 batch_idx + 1,
-                (observations.len() + BATCH_SIZE - 1) / BATCH_SIZE,
+                observations.len().div_ceil(BATCH_SIZE),
                 chunk.len()
             );
 

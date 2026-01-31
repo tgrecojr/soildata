@@ -161,11 +161,10 @@ impl Fetcher {
 
         for element in document.select(&selector) {
             if let Some(href) = element.value().attr("href") {
-                if href.starts_with("CRNH") && href.ends_with(".txt") {
-                    if filter.matches_file(href) {
-                        if let Some(file_info) = parse_filename(href, year, &self.base_url) {
-                            files.push(file_info);
-                        }
+                if href.starts_with("CRNH") && href.ends_with(".txt") && filter.matches_file(href)
+                {
+                    if let Some(file_info) = parse_filename(href, year, &self.base_url) {
+                        files.push(file_info);
                     }
                 }
             }

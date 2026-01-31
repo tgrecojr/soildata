@@ -1,6 +1,6 @@
 use chrono::Utc;
 use sqlx::PgPool;
-use uscrn_ingest::db::models::{InsertResult, NewObservation, NewProcessedFile, NewStation};
+use uscrn_ingest::db::models::{NewObservation, NewProcessedFile, NewStation};
 use uscrn_ingest::db::Repository;
 
 /// Test station upsert - insert new station
@@ -475,7 +475,7 @@ async fn test_mark_file_processed(pool: PgPool) {
         processing_status: "completed".to_string(),
     };
 
-    let file_id = repo
+    let _file_id = repo
         .mark_file_processed(file)
         .await
         .expect("File insert failed");
