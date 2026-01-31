@@ -393,6 +393,25 @@ cargo run
 
 ## Development
 
+### Before Creating a Pull Request (REQUIRED)
+
+**Always run the pre-PR checklist before creating a PR:**
+
+```bash
+chmod +x scripts/pre-pr-check.sh
+./scripts/pre-pr-check.sh
+```
+
+This ensures:
+- ✅ Code is properly formatted (`cargo fmt`)
+- ✅ No linter warnings (`cargo clippy`)
+- ✅ Tests pass locally
+- ✅ Build succeeds
+
+**Rule**: Do NOT create a PR until all pre-PR checks pass!
+
+---
+
 ### Local Development
 
 ```bash

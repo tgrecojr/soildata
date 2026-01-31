@@ -16,6 +16,20 @@ Rust application that periodically fetches hourly climate data from NOAA's US Cl
 
 ## Commands
 
+### Before Creating a PR (REQUIRED)
+**Always run this before creating a pull request:**
+```bash
+./scripts/pre-pr-check.sh
+```
+
+This runs:
+1. ✅ Code formatting check (`cargo fmt`)
+2. ✅ Linter (`cargo clippy`)
+3. ✅ Local tests (no database needed)
+4. ✅ Build verification
+
+**Rule**: Do NOT create a PR until all pre-PR checks pass!
+
 ### Local Development
 - `cargo build` — Build the application
 - `cargo build --release` — Build optimized release binary
