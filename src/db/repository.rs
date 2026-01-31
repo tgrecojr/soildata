@@ -1,4 +1,6 @@
-use crate::db::models::{InsertResult, NewObservation, NewProcessedFile, NewStation, ProcessedFile};
+use crate::db::models::{
+    InsertResult, NewObservation, NewProcessedFile, NewStation, ProcessedFile,
+};
 use crate::error::Result;
 use sqlx::PgPool;
 use tracing::{debug, info};
@@ -124,7 +126,7 @@ impl Repository {
         }
 
         let mut query_builder = sqlx::QueryBuilder::new(
-            "INSERT INTO stations (wbanno, name, state, latitude, longitude) "
+            "INSERT INTO stations (wbanno, name, state, latitude, longitude) ",
         );
 
         query_builder.push_values(stations, |mut b, station| {
@@ -139,7 +141,7 @@ impl Repository {
             " ON CONFLICT (wbanno) DO UPDATE SET \
             name = COALESCE(EXCLUDED.name, stations.name), \
             latitude = COALESCE(EXCLUDED.latitude, stations.latitude), \
-            longitude = COALESCE(EXCLUDED.longitude, stations.longitude)"
+            longitude = COALESCE(EXCLUDED.longitude, stations.longitude)",
         );
 
         query_builder.build().execute(&self.pool).await?;
@@ -184,7 +186,7 @@ impl Repository {
             debug!(
                 "Inserting batch {}/{} ({} observations)",
                 batch_idx + 1,
-                (observations.len() + BATCH_SIZE - 1) / BATCH_SIZE,
+                observations.len().div_ceil(BATCH_SIZE),
                 chunk.len()
             );
 
@@ -274,7 +276,7 @@ impl Repository {
                 soil_temp_20 = EXCLUDED.soil_temp_20, \
                 soil_temp_50 = EXCLUDED.soil_temp_50, \
                 soil_temp_100 = EXCLUDED.soil_temp_100, \
-                source_file_id = EXCLUDED.source_file_id"
+                source_file_id = EXCLUDED.source_file_id",
             );
 
             let result = query_builder.build().execute(&mut *tx).await?;

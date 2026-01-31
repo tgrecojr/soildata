@@ -100,7 +100,10 @@ impl Scheduler {
                 year
             );
         } else {
-            info!("Processing year {} (historical - will skip processed files)", year);
+            info!(
+                "Processing year {} (historical - will skip processed files)",
+                year
+            );
         }
 
         let files = fetcher
@@ -183,7 +186,7 @@ impl Scheduler {
         let content = fetcher.download_file(&file_info.url).await?;
 
         // Parse observations
-        let (observations, parse_stats) = Parser::parse_file(&content)?;
+        let (mut observations, parse_stats) = Parser::parse_file(&content)?;
 
         info!(
             "Parsed {} from {}: {} successful, {} failures ({:.1}% success rate)",
@@ -196,8 +199,23 @@ impl Scheduler {
                 * 100.0
         );
 
+        // Filter observations by station (WBANNO) if configured
+        let observations_before_filter = observations.len();
+        observations.retain(|obs| self.config.locations.matches_station(obs.wbanno));
+
+        if observations_before_filter > observations.len() {
+            info!(
+                "Station filter: kept {}/{} observations matching configured stations",
+                observations.len(),
+                observations_before_filter
+            );
+        }
+
         if observations.is_empty() {
-            warn!("No observations parsed from {}", file_info.name);
+            warn!(
+                "No observations remaining after filtering for {}",
+                file_info.name
+            );
 
             // Mark file as processed with failure status
             let failed_file = NewProcessedFile {
@@ -222,13 +240,15 @@ impl Scheduler {
         // Extract unique stations and batch upsert them
         let mut seen_stations = std::collections::HashMap::new();
         for obs in &observations {
-            seen_stations.entry(obs.wbanno).or_insert_with(|| NewStation {
-                wbanno: obs.wbanno,
-                name: Some(file_info.station_name.clone()),
-                state: file_info.state.clone(),
-                latitude: None,
-                longitude: None,
-            });
+            seen_stations
+                .entry(obs.wbanno)
+                .or_insert_with(|| NewStation {
+                    wbanno: obs.wbanno,
+                    name: Some(file_info.station_name.clone()),
+                    state: file_info.state.clone(),
+                    latitude: None,
+                    longitude: None,
+                });
         }
 
         // Batch upsert all unique stations in one query

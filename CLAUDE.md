@@ -16,6 +16,20 @@ Rust application that periodically fetches hourly climate data from NOAA's US Cl
 
 ## Commands
 
+### Before Creating a PR (REQUIRED)
+**Always run this before creating a pull request:**
+```bash
+./scripts/pre-pr-check.sh
+```
+
+This runs:
+1. ✅ Code formatting check (`cargo fmt`)
+2. ✅ Linter (`cargo clippy`)
+3. ✅ Local tests (no database needed)
+4. ✅ Build verification
+
+**Rule**: Do NOT create a PR until all pre-PR checks pass!
+
 ### Local Development
 - `cargo build` — Build the application
 - `cargo build --release` — Build optimized release binary
@@ -63,21 +77,70 @@ src/
 
 ## Environment Variables
 
-- `DATABASE_URL` — PostgreSQL connection string
+### Required in config/config.yaml
+- `DB_HOST` — Database host (e.g., localhost or postgres)
+- `DB_PORT` — Database port (e.g., 5432)
+- `DB_NAME` — Database name
+- `DB_USER` — Database user
+- `DB_PASSWORD` — Database password
+
+### Optional Environment Variables
 - `RUST_LOG` — Logging level (default: info,uscrn_ingest=debug)
+
+### Docker Compose Only
 - `POSTGRES_USER` — Database user (for docker-compose)
 - `POSTGRES_PASSWORD` — Database password (for docker-compose)
 - `POSTGRES_DB` — Database name (for docker-compose)
 
 ## Configuration
 
-Edit `config/config.yaml` to customize:
+1. Copy the example configuration:
+   ```bash
+   cp config/config.yaml.example config/config.yaml
+   ```
 
-- `scheduler.interval_minutes` — Polling frequency
-- `source.years_to_fetch` — "current", "all", or specific years
-- `locations.states` — Filter by 2-letter state codes
-- `locations.stations` — Filter by WBANNO station IDs
-- `locations.patterns` — Filter by glob patterns
+2. Edit `config/config.yaml` to customize:
+   - `scheduler.interval_minutes` — Polling frequency (default: 60)
+   - `source.years_to_fetch` — "current", "all", or specific years [2024, 2025]
+   - `locations.states` — Filter by 2-letter state codes ["CA", "TX"]
+   - `locations.stations` — Filter by WBANNO IDs [3761] (no leading zeros)
+   - `locations.patterns` — Filter by glob patterns ["*PA_Avondale*"]
+
+**Note**: `config/config.yaml` is gitignored. Only `config.yaml.example` is tracked.
+
+### Location Filtering Examples
+
+**By State:**
+```yaml
+locations:
+  states: ["PA"]
+  stations: []
+  patterns: []
+```
+
+**By Station ID (WBANNO):**
+```yaml
+locations:
+  states: []
+  stations: [3761]  # Avondale, PA (use number without leading zero)
+  patterns: []
+```
+
+**By Glob Pattern:**
+```yaml
+locations:
+  states: []
+  stations: []
+  patterns: ["*PA_Avondale*"]  # All Avondale, PA files
+```
+
+**Combined (OR logic):**
+```yaml
+locations:
+  states: ["CA"]
+  stations: [3761]
+  patterns: ["*_Bodega_*"]
+```
 
 ## Database Schema
 

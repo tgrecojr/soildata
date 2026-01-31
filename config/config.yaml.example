@@ -1,0 +1,40 @@
+# USCRN Data Ingestion Service Configuration
+
+# Database connection
+database:
+  host: "${DB_HOST}"
+  port: "${DB_PORT}"  # Accepts both number and string (e.g., 5432 or "5432")
+  name: "${DB_NAME}"
+  user: "${DB_USER}"
+  password: "${DB_PASSWORD}"
+  max_connections: 5
+
+# Polling configuration
+scheduler:
+  interval_minutes: 60        # How often to check for new data
+  initial_delay_seconds: 10   # Delay before first run
+
+# Data source
+source:
+  base_url: "https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/"
+  years_to_fetch: "current"   # "all", "current", or specific years [2023, 2024]
+  request_delay_ms: 500        # Delay between HTTP requests to avoid overwhelming server
+
+# Location filtering (empty arrays = collect all locations)
+# Filters use OR logic: any match will be included
+locations:
+  # Filter by state (2-letter codes)
+  # Example: ["CA", "TX", "PA"]
+  states: []
+
+  # Filter by specific stations (WBANNO IDs)
+  # IMPORTANT: Use numbers WITHOUT leading zeros
+  # Example: WBANNO 03761 in NOAA files → use 3761 here
+  # Example: [3761, 54762, 93107]
+  stations: []
+
+  # Filter by filename patterns (glob syntax)
+  # Example: ["*PA_Avondale*"] for all Avondale, PA files
+  # Example: ["CRNH0203-2026-*.txt"] for all 2026 files
+  # Example: ["*_Bodega_*"] for all Bodega stations
+  patterns: []

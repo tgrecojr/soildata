@@ -133,6 +133,14 @@ impl LocationFilter {
             return true;
         }
 
+        // If only station filter is set (not state or pattern), we need to download
+        // the file to check WBANNO, so pass all files at this stage
+        let has_file_level_filter = !self.states.is_empty() || !self.patterns.is_empty();
+        if !has_file_level_filter {
+            // Only station filter is set, will be applied after parsing
+            return true;
+        }
+
         // Extract state from filename: CRNH0203-{YEAR}-{STATE}_{LOCATION}...
         if let Some(state) = extract_state_from_filename(filename) {
             if !self.states.is_empty() && self.states.contains(&state.to_uppercase()) {
@@ -380,6 +388,21 @@ mod tests {
         let filter = LocationFilter::default();
         assert!(filter.matches_file("CRNH0203-2024-CA_Bodega_6_WSW.txt"));
         assert!(filter.matches_station(12345));
+    }
+
+    #[test]
+    fn test_station_only_filter_passes_all_files() {
+        // When only station filter is set, files can't be filtered by name
+        // (WBANNO is in file content), so all files should pass
+        let filter = LocationFilter {
+            states: vec![],
+            stations: vec![3761],
+            patterns: vec![],
+        };
+        assert!(filter.matches_file("CRNH0203-2024-PA_Avondale_2_N.txt"));
+        assert!(filter.matches_file("CRNH0203-2024-CA_Bodega_6_WSW.txt"));
+        assert!(filter.matches_station(3761)); // Passes station filter
+        assert!(!filter.matches_station(12345)); // Fails station filter
     }
 
     #[test]

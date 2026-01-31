@@ -1,0 +1,8 @@
+[advisories]
+# Ignore RUSTSEC-2023-0071 (RSA Marvin attack)
+# This vulnerability affects the `rsa` crate which is pulled in by sqlx-mysql,
+# but we only use PostgreSQL (not MySQL) so this dependency is not used in our application.
+# The vulnerability does not affect PostgreSQL connections.
+ignore = [
+    "RUSTSEC-2023-0071",  # rsa 0.9.10 - Marvin Attack (not used - we use PostgreSQL only)
+]

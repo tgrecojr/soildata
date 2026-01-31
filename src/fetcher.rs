@@ -15,10 +15,11 @@ const ALLOWED_HOSTS: &[&str] = &[
 
 /// Validate that a URL is from an allowed NOAA host
 fn validate_url(url: &str) -> Result<()> {
-    let parsed = url::Url::parse(url)
-        .map_err(|e| AppError::InvalidData(format!("Invalid URL: {}", e)))?;
+    let parsed =
+        url::Url::parse(url).map_err(|e| AppError::InvalidData(format!("Invalid URL: {}", e)))?;
 
-    let host = parsed.host_str()
+    let host = parsed
+        .host_str()
         .ok_or_else(|| AppError::InvalidData("URL missing host".to_string()))?;
 
     if !ALLOWED_HOSTS.contains(&host) {
@@ -87,9 +88,7 @@ impl Fetcher {
             let response = self.client.get(url).send().await?;
 
             if !response.status().is_success() {
-                return Err(AppError::Http(
-                    response.error_for_status().unwrap_err(),
-                ));
+                return Err(AppError::Http(response.error_for_status().unwrap_err()));
             }
 
             let content = response.text().await?;
@@ -99,10 +98,7 @@ impl Fetcher {
     }
 
     pub async fn list_years(&self) -> Result<Vec<i32>> {
-        retry_with_backoff(3, || async {
-            self.list_years_impl().await
-        })
-        .await
+        retry_with_backoff(3, || async { self.list_years_impl().await }).await
     }
 
     pub async fn list_files_for_year(
@@ -125,8 +121,8 @@ impl Fetcher {
         let html = response.text().await?;
 
         let document = Html::parse_document(&html);
-        let selector =
-            Selector::parse("a").map_err(|e| AppError::Parse(format!("Selector error: {:?}", e)))?;
+        let selector = Selector::parse("a")
+            .map_err(|e| AppError::Parse(format!("Selector error: {:?}", e)))?;
 
         let mut years = Vec::new();
 
@@ -158,18 +154,16 @@ impl Fetcher {
         let html = response.text().await?;
 
         let document = Html::parse_document(&html);
-        let selector =
-            Selector::parse("a").map_err(|e| AppError::Parse(format!("Selector error: {:?}", e)))?;
+        let selector = Selector::parse("a")
+            .map_err(|e| AppError::Parse(format!("Selector error: {:?}", e)))?;
 
         let mut files = Vec::new();
 
         for element in document.select(&selector) {
             if let Some(href) = element.value().attr("href") {
-                if href.starts_with("CRNH") && href.ends_with(".txt") {
-                    if filter.matches_file(href) {
-                        if let Some(file_info) = parse_filename(href, year, &self.base_url) {
-                            files.push(file_info);
-                        }
+                if href.starts_with("CRNH") && href.ends_with(".txt") && filter.matches_file(href) {
+                    if let Some(file_info) = parse_filename(href, year, &self.base_url) {
+                        files.push(file_info);
                     }
                 }
             }
@@ -274,8 +268,11 @@ mod tests {
 
     #[test]
     fn test_parse_filename() {
-        let result =
-            parse_filename("CRNH0203-2024-CA_Bodega_6_WSW.txt", 2024, "https://example.com");
+        let result = parse_filename(
+            "CRNH0203-2024-CA_Bodega_6_WSW.txt",
+            2024,
+            "https://example.com",
+        );
 
         assert!(result.is_some());
         let file_info = result.unwrap();
@@ -287,8 +284,11 @@ mod tests {
 
     #[test]
     fn test_parse_filename_texas() {
-        let result =
-            parse_filename("CRNH0203-2024-TX_Austin_33_NW.txt", 2024, "https://example.com");
+        let result = parse_filename(
+            "CRNH0203-2024-TX_Austin_33_NW.txt",
+            2024,
+            "https://example.com",
+        );
 
         assert!(result.is_some());
         let file_info = result.unwrap();

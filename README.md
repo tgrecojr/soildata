@@ -174,7 +174,12 @@ The default `Dockerfile` uses **cargo-chef** for intelligent dependency caching 
 
 ## Configuration
 
-Edit `config/config.yaml` to customize the ingestion:
+1. Copy the example configuration:
+   ```bash
+   cp config/config.yaml.example config/config.yaml
+   ```
+
+2. Edit `config/config.yaml` to customize the ingestion (this file is gitignored):
 
 ```yaml
 # Database connection (supports environment variable substitution)
@@ -196,12 +201,97 @@ source:
 
 # Location filtering (empty = all locations)
 locations:
-  states: ["CA", "TX"]  # Filter by state
-  stations: []          # Filter by WBANNO IDs
-  patterns: []          # Filter by glob patterns
+  states: []     # Filter by state (2-letter codes)
+  stations: []   # Filter by WBANNO station IDs
+  patterns: []   # Filter by filename glob patterns
 ```
 
 **Note**: The port field is robust and accepts both numeric and string values. This handles environment variable substitution gracefully whether the value comes in as `5432` or `"5432"`.
+
+### Location Filtering
+
+You can filter data collection in three ways. Leave all arrays empty to collect data from all stations.
+
+#### 1. Filter by State
+
+Collect data from all stations in specific states using 2-letter state codes:
+
+```yaml
+locations:
+  states: ["CA", "TX", "PA"]
+  stations: []
+  patterns: []
+```
+
+This will download files like:
+- `CRNH0203-2026-CA_Bodega_6_WSW.txt`
+- `CRNH0203-2026-TX_Austin_33_NW.txt`
+- `CRNH0203-2026-PA_Avondale_2_N.txt`
+
+#### 2. Filter by Station ID (WBANNO)
+
+Collect data from specific stations using their WBANNO identifier:
+
+```yaml
+locations:
+  states: []
+  stations: [3761, 54762, 93107]
+  patterns: []
+```
+
+**Important**:
+- WBANNO values in NOAA files appear with leading zeros (e.g., `03761`), but you must specify them **without** leading zeros in the config (e.g., `3761`). The application automatically handles the conversion.
+- Station filtering happens **after** downloading files (WBANNO is inside file content), so all files will be listed and downloaded, then filtered during processing. For efficiency, combine with state or pattern filters if possible.
+
+**Finding Station IDs:**
+1. Browse available files at https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/2026/
+2. Download a file for your desired station
+3. The first column in the data file is the WBANNO
+4. Use that number without leading zeros in your config
+
+Example: Avondale, PA station shows `03761` in the data file → use `3761` in config
+
+#### 3. Filter by Filename Pattern (Glob)
+
+Use glob patterns to match specific filenames:
+
+```yaml
+locations:
+  states: []
+  stations: []
+  patterns: ["*PA_Avondale*"]
+```
+
+**Pattern Examples:**
+
+| Pattern | Matches |
+|---------|---------|
+| `*PA_Avondale*` | All Avondale, PA files across all years |
+| `CRNH0203-2026-*.txt` | All stations for year 2026 only |
+| `*_Bodega_*` | All Bodega stations (any state/year) |
+| `CRNH0203-*-CA_*.txt` | All California stations, all years |
+
+NOAA filename format: `CRNH0203-{YEAR}-{STATE}_{LOCATION}_{DISTANCE}_{DIRECTION}.txt`
+
+Example: `CRNH0203-2026-PA_Avondale_2_N.txt`
+- Year: 2026
+- State: PA
+- Location: Avondale
+- Distance: 2 miles
+- Direction: N (North)
+
+#### 4. Combine Filters
+
+Filters work together with OR logic (any match will be included):
+
+```yaml
+locations:
+  states: ["CA"]              # All California stations
+  stations: [3761]            # Plus Avondale, PA
+  patterns: ["*_Bodega_*"]    # Plus all Bodega stations
+```
+
+This collects: All CA stations + Avondale PA (WBANNO 03761) + Any Bodega station from any state.
 
 ## Database Schema
 
@@ -302,6 +392,25 @@ cargo run
 **Solution**: Ensure you're running from the project root where `config/` directory exists.
 
 ## Development
+
+### Before Creating a Pull Request (REQUIRED)
+
+**Always run the pre-PR checklist before creating a PR:**
+
+```bash
+chmod +x scripts/pre-pr-check.sh
+./scripts/pre-pr-check.sh
+```
+
+This ensures:
+- ✅ Code is properly formatted (`cargo fmt`)
+- ✅ No linter warnings (`cargo clippy`)
+- ✅ Tests pass locally
+- ✅ Build succeeds
+
+**Rule**: Do NOT create a PR until all pre-PR checks pass!
+
+---
 
 ### Local Development
 
