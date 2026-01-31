@@ -20,8 +20,17 @@ scraper = "0.22"
 glob = "0.3"
 regex-lite = "0.1"
 anyhow = "1"
+url = "2"
 
 [dev-dependencies]
 tokio-test = "0.4"
 wiremock = "0.6"
 tempfile = "3"
+
+# Release profile optimizations for smaller binaries
+[profile.release]
+strip = true         # Strip debug symbols
+lto = "thin"         # Link-Time Optimization (thin is faster than full, good size reduction)
+codegen-units = 1    # Better optimization at cost of compile time
+opt-level = "z"      # Optimize for size
+panic = "abort"      # Smaller binary, no unwinding

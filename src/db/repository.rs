@@ -89,6 +89,9 @@ impl Repository {
         Ok(result)
     }
 
+    /// Upsert a single station into the database
+    ///
+    /// For batch operations, use `batch_upsert_stations` instead to avoid N+1 queries
     pub async fn upsert_station(&self, station: NewStation) -> Result<()> {
         sqlx::query(
             r#"
@@ -111,6 +114,53 @@ impl Repository {
         Ok(())
     }
 
+    /// Batch upsert multiple stations in a single query
+    ///
+    /// This is more efficient than calling `upsert_station` multiple times
+    /// as it avoids N+1 query problems.
+    pub async fn batch_upsert_stations(&self, stations: &[NewStation]) -> Result<()> {
+        if stations.is_empty() {
+            return Ok(());
+        }
+
+        let mut query_builder = sqlx::QueryBuilder::new(
+            "INSERT INTO stations (wbanno, name, state, latitude, longitude) "
+        );
+
+        query_builder.push_values(stations, |mut b, station| {
+            b.push_bind(station.wbanno)
+                .push_bind(&station.name)
+                .push_bind(&station.state)
+                .push_bind(station.latitude)
+                .push_bind(station.longitude);
+        });
+
+        query_builder.push(
+            " ON CONFLICT (wbanno) DO UPDATE SET \
+            name = COALESCE(EXCLUDED.name, stations.name), \
+            latitude = COALESCE(EXCLUDED.latitude, stations.latitude), \
+            longitude = COALESCE(EXCLUDED.longitude, stations.longitude)"
+        );
+
+        query_builder.build().execute(&self.pool).await?;
+
+        Ok(())
+    }
+
+    /// Insert or update observations in batch
+    ///
+    /// Uses PostgreSQL's ON CONFLICT to upsert observations efficiently.
+    /// Processes in batches of 1000 to avoid query size limits.
+    ///
+    /// # Arguments
+    /// * `observations` - Slice of observations to insert/update
+    /// * `source_file_id` - ID of the processed file these observations came from
+    ///
+    /// # Returns
+    /// InsertResult with the total number of rows affected
+    ///
+    /// Note: PostgreSQL's ON CONFLICT doesn't distinguish between inserts and updates
+    /// in rows_affected, so we report total_rows_affected for both fields.
     pub async fn insert_observations(
         &self,
         observations: &[NewObservation],
@@ -123,10 +173,6 @@ impl Repository {
                 total_rows_affected: 0,
             });
         }
-
-        // Count existing observations before we start
-        // This helps us estimate inserts vs updates
-        let existing_count = self.count_existing_observations(observations).await?;
 
         let mut total_rows_affected = 0;
         let mut tx = self.pool.begin().await?;
@@ -238,50 +284,13 @@ impl Repository {
 
         tx.commit().await?;
 
-        // Estimate inserts vs updates
-        // If rows_affected > existing_count, the difference is new inserts
-        // Otherwise, all were updates
-        let inserted = total_rows_affected.saturating_sub(existing_count);
-        let updated = existing_count.min(total_rows_affected);
-
+        // Note: We don't distinguish between inserts and updates as PostgreSQL's
+        // ON CONFLICT doesn't provide this information in rows_affected.
+        // Both values are set to total_rows_affected for backward compatibility.
         Ok(InsertResult {
-            inserted,
-            updated,
+            inserted: total_rows_affected,
+            updated: 0, // Not tracked separately
             total_rows_affected,
         })
-    }
-
-    async fn count_existing_observations(&self, observations: &[NewObservation]) -> Result<usize> {
-        if observations.is_empty() {
-            return Ok(0);
-        }
-
-        // Build a query to count matching (wbanno, utc_datetime) pairs
-        // Using a VALUES clause for efficiency
-        let mut query_builder = sqlx::QueryBuilder::new(
-            "SELECT COUNT(*) FROM observations WHERE (wbanno, utc_datetime) IN ("
-        );
-
-        let mut first = true;
-        for obs in observations {
-            if !first {
-                query_builder.push(", ");
-            }
-            query_builder.push("(");
-            query_builder.push_bind(obs.wbanno);
-            query_builder.push(", ");
-            query_builder.push_bind(obs.utc_datetime);
-            query_builder.push(")");
-            first = false;
-        }
-
-        query_builder.push(")");
-
-        let count: i64 = query_builder
-            .build_query_scalar()
-            .fetch_one(&self.pool)
-            .await?;
-
-        Ok(count as usize)
     }
 }

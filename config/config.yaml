@@ -3,7 +3,7 @@
 # Database connection
 database:
   host: "${DB_HOST}"
-  port: "${DB_PORT}"
+  port: "${DB_PORT}"  # Accepts both number and string (e.g., 5432 or "5432")
   name: "${DB_NAME}"
   user: "${DB_USER}"
   password: "${DB_PASSWORD}"

@@ -8,7 +8,8 @@
 
 # Rust
 target/
-Cargo.lock
+# Note: Cargo.lock is NOT ignored for binary crates (applications)
+# It should be committed to ensure reproducible builds
 
 # Dependencies
 node_modules/

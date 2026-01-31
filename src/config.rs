@@ -1,5 +1,5 @@
 use crate::error::{AppError, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
@@ -14,7 +14,7 @@ pub struct Config {
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
     pub host: String,
-    #[serde(default = "default_db_port")]
+    #[serde(default = "default_db_port", deserialize_with = "deserialize_port")]
     pub port: u16,
     pub name: String,
     pub user: String,
@@ -29,6 +29,31 @@ fn default_db_port() -> u16 {
 
 fn default_max_connections() -> u32 {
     5
+}
+
+/// Custom deserializer that handles port as both number and string
+///
+/// Accepts:
+/// - `port: 5432` (number)
+/// - `port: "5432"` (string that parses to number)
+/// - `port: ${DB_PORT}` (env var substituted to either)
+fn deserialize_port<'de, D>(deserializer: D) -> std::result::Result<u16, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum PortValue {
+        Number(u16),
+        String(String),
+    }
+
+    match PortValue::deserialize(deserializer)? {
+        PortValue::Number(n) => Ok(n),
+        PortValue::String(s) => s
+            .parse::<u16>()
+            .map_err(|_| serde::de::Error::custom(format!("Invalid port number: '{}'", s))),
+    }
 }
 
 impl DatabaseConfig {
@@ -170,6 +195,14 @@ impl Config {
         Ok(config)
     }
 
+    /// Validate configuration values
+    ///
+    /// Checks for:
+    /// - Unexpanded environment variables
+    /// - Valid port ranges
+    /// - Non-empty required fields
+    /// - Positive time intervals
+    /// - Valid URL formats
     fn validate(&self) -> Result<()> {
         // Check if any database field contains unexpanded environment variables
         let fields_to_check = [
@@ -197,9 +230,80 @@ impl Config {
             ));
         }
 
-        // Validate port is reasonable
+        // Validate database name is not empty
+        if self.database.name.is_empty() {
+            return Err(AppError::Config(
+                "Database name cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate user is not empty
+        if self.database.user.is_empty() {
+            return Err(AppError::Config(
+                "Database user cannot be empty".to_string(),
+            ));
+        }
+
+        // Validate port is not zero (u16 max is 65535, so no upper bound check needed)
         if self.database.port == 0 {
             return Err(AppError::Config("Database port cannot be 0".to_string()));
+        }
+
+        // Validate max_connections is reasonable
+        if self.database.max_connections == 0 {
+            return Err(AppError::Config(
+                "Database max_connections must be at least 1".to_string(),
+            ));
+        }
+
+        if self.database.max_connections > 100 {
+            return Err(AppError::Config(format!(
+                "Database max_connections {} seems too high, maximum recommended is 100",
+                self.database.max_connections
+            )));
+        }
+
+        // Validate scheduler interval is positive
+        if self.scheduler.interval_minutes == 0 {
+            return Err(AppError::Config(
+                "Scheduler interval_minutes must be greater than 0".to_string(),
+            ));
+        }
+
+        // Warn if interval is too short
+        if self.scheduler.interval_minutes < 5 {
+            tracing::warn!(
+                "Scheduler interval of {} minutes is very short, consider using at least 5 minutes",
+                self.scheduler.interval_minutes
+            );
+        }
+
+        // Validate base URL format
+        if let Err(e) = url::Url::parse(&self.source.base_url) {
+            return Err(AppError::Config(format!(
+                "Invalid source base_url '{}': {}",
+                self.source.base_url, e
+            )));
+        }
+
+        // Validate base URL is HTTPS
+        if let Ok(parsed) = url::Url::parse(&self.source.base_url) {
+            if parsed.scheme() != "https" {
+                return Err(AppError::Config(format!(
+                    "Source base_url must use HTTPS, got: {}",
+                    parsed.scheme()
+                )));
+            }
+        }
+
+        // Validate state codes are 2 characters
+        for state in &self.locations.states {
+            if state.len() != 2 {
+                return Err(AppError::Config(format!(
+                    "State code '{}' must be exactly 2 characters (e.g., 'CA', 'TX')",
+                    state
+                )));
+            }
         }
 
         Ok(())
@@ -276,5 +380,46 @@ mod tests {
         let filter = LocationFilter::default();
         assert!(filter.matches_file("CRNH0203-2024-CA_Bodega_6_WSW.txt"));
         assert!(filter.matches_station(12345));
+    }
+
+    #[test]
+    fn test_port_deserialize_from_number() {
+        let yaml = r#"
+host: localhost
+port: 5432
+name: test
+user: test
+password: test
+"#;
+        let config: DatabaseConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.port, 5432);
+    }
+
+    #[test]
+    fn test_port_deserialize_from_string() {
+        let yaml = r#"
+host: localhost
+port: "5432"
+name: test
+user: test
+password: test
+"#;
+        let config: DatabaseConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(config.port, 5432);
+    }
+
+    #[test]
+    fn test_port_deserialize_invalid_string() {
+        let yaml = r#"
+host: localhost
+port: "not_a_number"
+name: test
+user: test
+password: test
+"#;
+        let result: std::result::Result<DatabaseConfig, _> = serde_yaml::from_str(yaml);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid port number") || err_msg.contains("not_a_number"));
     }
 }

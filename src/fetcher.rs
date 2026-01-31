@@ -5,6 +5,41 @@ use scraper::{Html, Selector};
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
+/// Allowed hostnames for NOAA data fetching (prevents SSRF attacks)
+const ALLOWED_HOSTS: &[&str] = &[
+    "www.ncei.noaa.gov",
+    "ncei.noaa.gov",
+    "www1.ncdc.noaa.gov",
+    "ncdc.noaa.gov",
+];
+
+/// Validate that a URL is from an allowed NOAA host
+fn validate_url(url: &str) -> Result<()> {
+    let parsed = url::Url::parse(url)
+        .map_err(|e| AppError::InvalidData(format!("Invalid URL: {}", e)))?;
+
+    let host = parsed.host_str()
+        .ok_or_else(|| AppError::InvalidData("URL missing host".to_string()))?;
+
+    if !ALLOWED_HOSTS.contains(&host) {
+        return Err(AppError::InvalidData(format!(
+            "URL host '{}' not in allowed list. Expected one of: {}",
+            host,
+            ALLOWED_HOSTS.join(", ")
+        )));
+    }
+
+    // Ensure HTTPS
+    if parsed.scheme() != "https" {
+        return Err(AppError::InvalidData(format!(
+            "URL must use HTTPS, got: {}",
+            parsed.scheme()
+        )));
+    }
+
+    Ok(())
+}
+
 pub struct Fetcher {
     client: Client,
     base_url: String,
@@ -32,8 +67,21 @@ impl Fetcher {
         })
     }
 
+    /// Download a file from a validated NOAA URL
+    ///
+    /// # Arguments
+    /// * `url` - The URL to download from (must be from allowed NOAA hosts)
+    ///
+    /// # Returns
+    /// The file content as a string
+    ///
+    /// # Errors
+    /// Returns error if URL validation fails or download fails
     pub async fn download_file(&self, url: &str) -> Result<String> {
         debug!("Downloading file from {}", url);
+
+        // Validate URL before making request
+        validate_url(url)?;
 
         retry_with_backoff(3, || async {
             let response = self.client.get(url).send().await?;
