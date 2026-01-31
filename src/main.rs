@@ -15,9 +15,10 @@ async fn main() -> anyhow::Result<()> {
 
     // Initialize tracing
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-            EnvFilter::new("info,uscrn_ingest=debug,sqlx=warn")
-        }))
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("info,uscrn_ingest=debug,sqlx=warn")),
+        )
         .with(tracing_subscriber::fmt::layer())
         .init();
 

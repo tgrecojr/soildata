@@ -131,7 +131,9 @@ async fn test_insert_observations(pool: PgPool) {
         latitude: None,
         longitude: None,
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // Create a processed file to get file_id
     let file = NewProcessedFile {
@@ -148,48 +150,49 @@ async fn test_insert_observations(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     // Create test observations
-    let observations = vec![
-        NewObservation {
-            wbanno: 53104,
-            utc_datetime: Utc::now(),
-            lst_datetime: Utc::now(),
-            crx_version: Some("3".to_string()),
-            t_calc: Some(20.5),
-            t_hr_avg: Some(21.0),
-            t_max: Some(22.0),
-            t_min: Some(19.0),
-            p_calc: Some(0.0),
-            solarad: Some(450.0),
-            solarad_flag: Some(0),
-            solarad_max: Some(500.0),
-            solarad_max_flag: Some(0),
-            solarad_min: Some(400.0),
-            solarad_min_flag: Some(0),
-            sur_temp_type: Some("C".to_string()),
-            sur_temp: Some(18.5),
-            sur_temp_flag: Some(0),
-            sur_temp_max: Some(20.0),
-            sur_temp_max_flag: Some(0),
-            sur_temp_min: Some(17.0),
-            sur_temp_min_flag: Some(0),
-            rh_hr_avg: Some(65.0),
-            rh_hr_avg_flag: Some(0),
-            soil_moisture_5: Some(0.25),
-            soil_moisture_10: Some(0.30),
-            soil_moisture_20: Some(0.28),
-            soil_moisture_50: Some(0.32),
-            soil_moisture_100: Some(0.35),
-            soil_temp_5: Some(15.0),
-            soil_temp_10: Some(14.5),
-            soil_temp_20: Some(14.0),
-            soil_temp_50: Some(13.5),
-            soil_temp_100: Some(13.0),
-            source_file_id: None,
-        },
-    ];
+    let observations = vec![NewObservation {
+        wbanno: 53104,
+        utc_datetime: Utc::now(),
+        lst_datetime: Utc::now(),
+        crx_version: Some("3".to_string()),
+        t_calc: Some(20.5),
+        t_hr_avg: Some(21.0),
+        t_max: Some(22.0),
+        t_min: Some(19.0),
+        p_calc: Some(0.0),
+        solarad: Some(450.0),
+        solarad_flag: Some(0),
+        solarad_max: Some(500.0),
+        solarad_max_flag: Some(0),
+        solarad_min: Some(400.0),
+        solarad_min_flag: Some(0),
+        sur_temp_type: Some("C".to_string()),
+        sur_temp: Some(18.5),
+        sur_temp_flag: Some(0),
+        sur_temp_max: Some(20.0),
+        sur_temp_max_flag: Some(0),
+        sur_temp_min: Some(17.0),
+        sur_temp_min_flag: Some(0),
+        rh_hr_avg: Some(65.0),
+        rh_hr_avg_flag: Some(0),
+        soil_moisture_5: Some(0.25),
+        soil_moisture_10: Some(0.30),
+        soil_moisture_20: Some(0.28),
+        soil_moisture_50: Some(0.32),
+        soil_moisture_100: Some(0.35),
+        soil_temp_5: Some(15.0),
+        soil_temp_10: Some(14.5),
+        soil_temp_20: Some(14.0),
+        soil_temp_50: Some(13.5),
+        soil_temp_100: Some(13.0),
+        source_file_id: None,
+    }];
 
     let result = repo
         .insert_observations(&observations, file_id)
@@ -221,7 +224,9 @@ async fn test_upsert_observation_updates_existing(pool: PgPool) {
         latitude: None,
         longitude: None,
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // Create processed file
     let file = NewProcessedFile {
@@ -238,7 +243,10 @@ async fn test_upsert_observation_updates_existing(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     let timestamp = Utc::now();
 
@@ -362,7 +370,9 @@ async fn test_large_batch_insert(pool: PgPool) {
         latitude: None,
         longitude: None,
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // Create processed file
     let file = NewProcessedFile {
@@ -379,7 +389,10 @@ async fn test_large_batch_insert(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     // Create 2000 observations (tests batching logic)
     let mut observations = Vec::new();
@@ -462,7 +475,10 @@ async fn test_mark_file_processed(pool: PgPool) {
         processing_status: "completed".to_string(),
     };
 
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     // Verify file was inserted
     let is_processed = repo
@@ -511,7 +527,9 @@ async fn test_get_processed_files_for_year(pool: PgPool) {
                 parse_failures: 0,
                 processing_status: "completed".to_string(),
             };
-            repo.mark_file_processed(file).await.expect("File insert failed");
+            repo.mark_file_processed(file)
+                .await
+                .expect("File insert failed");
         }
     }
 

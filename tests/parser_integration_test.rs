@@ -28,7 +28,9 @@ async fn test_parse_and_insert_complete_flow(pool: PgPool) {
         latitude: Some(36.53),
         longitude: Some(-81.74),
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // Create processed file record
     let file = NewProcessedFile {
@@ -45,7 +47,10 @@ async fn test_parse_and_insert_complete_flow(pool: PgPool) {
         parse_failures: stats.parse_failures as i32,
         processing_status: "processing".to_string(),
     };
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     // Insert observations
     let result = repo
@@ -56,13 +61,11 @@ async fn test_parse_and_insert_complete_flow(pool: PgPool) {
     assert_eq!(result.total_rows_affected, 2);
 
     // Verify the observations in database
-    let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM observations WHERE wbanno = $1",
-    )
-    .bind(53104)
-    .fetch_one(&pool)
-    .await
-    .expect("Count query failed");
+    let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM observations WHERE wbanno = $1")
+        .bind(53104)
+        .fetch_one(&pool)
+        .await
+        .expect("Count query failed");
 
     assert_eq!(count, 2);
 
@@ -99,7 +102,9 @@ async fn test_parse_missing_values_stored_as_null(pool: PgPool) {
         latitude: None,
         longitude: None,
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // Create processed file
     let file = NewProcessedFile {
@@ -116,7 +121,10 @@ async fn test_parse_missing_values_stored_as_null(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id = repo.mark_file_processed(file).await.expect("File insert failed");
+    let file_id = repo
+        .mark_file_processed(file)
+        .await
+        .expect("File insert failed");
 
     repo.insert_observations(&observations, file_id)
         .await
@@ -214,7 +222,9 @@ async fn test_reimport_deduplicates_observations(pool: PgPool) {
         latitude: None,
         longitude: None,
     };
-    repo.upsert_station(station).await.expect("Station insert failed");
+    repo.upsert_station(station)
+        .await
+        .expect("Station insert failed");
 
     // First import
     let (observations, _) = Parser::parse_file(file_content).expect("Parse failed");
@@ -233,7 +243,10 @@ async fn test_reimport_deduplicates_observations(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id1 = repo.mark_file_processed(file1).await.expect("File insert failed");
+    let file_id1 = repo
+        .mark_file_processed(file1)
+        .await
+        .expect("File insert failed");
 
     repo.insert_observations(&observations, file_id1)
         .await
@@ -254,20 +267,21 @@ async fn test_reimport_deduplicates_observations(pool: PgPool) {
         parse_failures: 0,
         processing_status: "processing".to_string(),
     };
-    let file_id2 = repo.mark_file_processed(file2).await.expect("File insert failed");
+    let file_id2 = repo
+        .mark_file_processed(file2)
+        .await
+        .expect("File insert failed");
 
     repo.insert_observations(&observations, file_id2)
         .await
         .expect("Second insert failed");
 
     // Verify only 1 observation exists (deduplicated on wbanno + utc_datetime)
-    let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM observations WHERE wbanno = $1",
-    )
-    .bind(53104)
-    .fetch_one(&pool)
-    .await
-    .expect("Count query failed");
+    let count = sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM observations WHERE wbanno = $1")
+        .bind(53104)
+        .fetch_one(&pool)
+        .await
+        .expect("Count query failed");
 
     assert_eq!(count, 1, "Should have deduplicated the observation");
 }

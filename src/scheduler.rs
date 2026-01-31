@@ -100,7 +100,10 @@ impl Scheduler {
                 year
             );
         } else {
-            info!("Processing year {} (historical - will skip processed files)", year);
+            info!(
+                "Processing year {} (historical - will skip processed files)",
+                year
+            );
         }
 
         let files = fetcher
@@ -209,7 +212,10 @@ impl Scheduler {
         }
 
         if observations.is_empty() {
-            warn!("No observations remaining after filtering for {}", file_info.name);
+            warn!(
+                "No observations remaining after filtering for {}",
+                file_info.name
+            );
 
             // Mark file as processed with failure status
             let failed_file = NewProcessedFile {
@@ -234,13 +240,15 @@ impl Scheduler {
         // Extract unique stations and batch upsert them
         let mut seen_stations = std::collections::HashMap::new();
         for obs in &observations {
-            seen_stations.entry(obs.wbanno).or_insert_with(|| NewStation {
-                wbanno: obs.wbanno,
-                name: Some(file_info.station_name.clone()),
-                state: file_info.state.clone(),
-                latitude: None,
-                longitude: None,
-            });
+            seen_stations
+                .entry(obs.wbanno)
+                .or_insert_with(|| NewStation {
+                    wbanno: obs.wbanno,
+                    name: Some(file_info.station_name.clone()),
+                    state: file_info.state.clone(),
+                    latitude: None,
+                    longitude: None,
+                });
         }
 
         // Batch upsert all unique stations in one query
