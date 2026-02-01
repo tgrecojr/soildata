@@ -9,6 +9,7 @@ A Rust application that periodically fetches hourly climate data from NOAA's US 
 - Idempotent processing (tracks processed files)
 - Graceful shutdown handling
 - Docker deployment ready
+- **Grafana dashboard** for gardening/landscaping decisions
 
 ## Quick Start
 
@@ -36,6 +37,10 @@ RUST_LOG=info,uscrn_ingest=debug,sqlx=warn
 POSTGRES_USER=uscrn
 POSTGRES_PASSWORD=changeme_secure_password
 POSTGRES_DB=uscrn
+
+# Grafana (optional)
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
 EOF
    ```
    **⚠️ Important**: Change `DB_PASSWORD` and `POSTGRES_PASSWORD` to a secure password!
@@ -52,7 +57,12 @@ EOF
    docker-compose logs -f
    ```
 
-5. Stop services:
+5. Access Grafana dashboard:
+   - URL: http://localhost:3000
+   - Login: admin/admin (or values from `.env`)
+   - Dashboard: "Gardening Weather Dashboard" in the Gardening folder
+
+6. Stop services:
    ```bash
    docker-compose down
    ```
@@ -70,6 +80,7 @@ docker-compose up --build -d
 docker-compose logs -f          # All services
 docker-compose logs -f app      # App only
 docker-compose logs -f db       # Database only
+docker-compose logs -f grafana  # Grafana only
 
 # Stop services (keeps volumes)
 docker-compose down
@@ -292,6 +303,45 @@ locations:
 ```
 
 This collects: All CA stations + Avondale PA (WBANNO 03761) + Any Bodega station from any state.
+
+## Grafana Dashboard
+
+The project includes a pre-configured Grafana dashboard designed for **gardening and landscaping decisions**.
+
+### Access
+
+- **URL**: http://localhost:3000
+- **Default login**: admin/admin (configurable via `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`)
+- **Dashboard location**: Gardening folder → "Gardening Weather Dashboard"
+
+### Dashboard Features
+
+| Section | Panels |
+|---------|--------|
+| **Current Conditions** | Air temp, Soil temp (10cm), Soil moisture, Humidity, 24h precipitation, Frost alert |
+| **Soil Conditions** | Temperature & moisture at 5 depths (5-100cm) with threshold indicators |
+| **Temperature & Growing** | Air temperature with frost zone, Growing Degree Days (cumulative, base 50°F) |
+| **Precipitation & Disease Risk** | Rainfall chart, Humidity with disease risk thresholds |
+| **Decision Support** | Activity recommendations table, Daily summary with GDD |
+
+### Key Gardening Thresholds
+
+| Metric | Threshold | Meaning |
+|--------|-----------|---------|
+| Soil temp 10cm | >50°F | Safe for cool-season crops |
+| Soil temp 10cm | >59°F | Safe for warm-season crops |
+| Soil moisture | <10% | Irrigation needed |
+| Soil moisture | >40% | Saturated - avoid fertilizer |
+| Air temp | <32°F | Frost warning |
+| Humidity | >80% | Disease risk increased |
+
+### Importing to External Grafana
+
+To use the dashboard in your own Grafana instance:
+
+1. Copy `grafana/dashboards/gardening-weather.json`
+2. In Grafana: Dashboards → Import → Upload JSON file
+3. Configure a PostgreSQL datasource pointing to your USCRN database
 
 ## Database Schema
 
