@@ -127,6 +127,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
 
       # Determine platforms: only build ARM64 for tagged releases
       - name: Set platform targets
