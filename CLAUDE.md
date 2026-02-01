@@ -13,6 +13,7 @@ Rust application that periodically fetches hourly climate data from NOAA's US Cl
 - Config: YAML with environment variable substitution
 - Containerization: Docker with multi-stage builds (cargo-chef)
 - Build Tool: cargo-chef for optimized Docker layer caching
+- Visualization: Grafana with gardening-focused dashboard
 
 ## Commands
 
@@ -62,6 +63,15 @@ src/
     ├── mod.rs
     ├── models.rs     # Database models
     └── repository.rs # Database operations
+
+grafana/
+├── dashboards/
+│   └── gardening-weather.json  # Importable dashboard
+└── provisioning/
+    ├── dashboards/
+    │   └── dashboard.yml       # Dashboard provider config
+    └── datasources/
+        └── postgres.yml        # PostgreSQL datasource config
 ```
 
 ## Data Flow
@@ -91,6 +101,8 @@ src/
 - `POSTGRES_USER` — Database user (for docker-compose)
 - `POSTGRES_PASSWORD` — Database password (for docker-compose)
 - `POSTGRES_DB` — Database name (for docker-compose)
+- `GRAFANA_ADMIN_USER` — Grafana admin username (default: admin)
+- `GRAFANA_ADMIN_PASSWORD` — Grafana admin password (default: admin)
 
 ## Configuration
 
@@ -176,6 +188,54 @@ The project uses **cargo-chef** + **distroless** for optimized production builds
 - Only rebuilds deps when Cargo.toml changes
 - Faster CI/CD pipelines (5-10x faster on cache hit)
 - Final image: ~50-80MB (vs 200MB+ with debian:slim)
+
+## Grafana Dashboard
+
+The project includes a Grafana instance with a pre-configured gardening-focused dashboard.
+
+### Access
+- URL: http://localhost:3000
+- Default credentials: admin/admin (configurable via environment variables)
+
+### Dashboard Features
+The "Gardening Weather Dashboard" is designed for landscaping and gardening decisions:
+
+**Current Conditions** (stat panels):
+- Air Temperature, Soil Temperature (10cm), Soil Moisture, Humidity
+- 24h Precipitation total
+- Frost Alert indicator
+
+**Soil Conditions**:
+- Soil temperature at 5 depths (5, 10, 20, 50, 100cm) with seeding thresholds
+- Soil moisture at 5 depths with irrigation thresholds
+
+**Temperature & Growing**:
+- Air temperature with frost threshold visualization
+- Growing Degree Days (GDD) cumulative chart (base 10°C)
+
+**Precipitation & Disease Risk**:
+- Precipitation bar chart
+- Humidity with disease risk thresholds (>80%)
+
+**Decision Support**:
+- Activity recommendations table (seeding, fertilizing, irrigation, fungicide)
+- Daily summary with temperature range and GDD
+
+### Importing to External Grafana
+To use the dashboard in your own Grafana instance:
+1. Copy `grafana/dashboards/gardening-weather.json`
+2. In Grafana: Dashboards → Import → Upload JSON file
+3. Configure your PostgreSQL datasource to match the schema
+
+### Key Gardening Thresholds
+| Metric | Threshold | Meaning |
+|--------|-----------|---------|
+| Soil temp 10cm | >50°F | Safe for cool-season crops |
+| Soil temp 10cm | >59°F | Safe for warm-season crops |
+| Soil moisture | <0.10 | Irrigation needed |
+| Soil moisture | >0.40 | Saturated - avoid fertilizer |
+| Air temp | <32°F | Frost warning |
+| Humidity | >80% | Disease risk increased |
 
 ## NOAA Data Source
 
