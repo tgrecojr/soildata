@@ -116,7 +116,10 @@ impl Parser {
     }
 
     fn parse_line(line: &str) -> Result<NewObservation> {
-        let fields: Vec<&str> = line.split_whitespace().collect();
+        // Strip invisible Unicode characters (BOM, zero-width spaces, etc.) that can
+        // appear in NOAA data files downloaded from external sources
+        let cleaned_line: String = line.chars().filter(|c| c.is_ascii()).collect();
+        let fields: Vec<&str> = cleaned_line.split_whitespace().collect();
 
         if fields.len() < 28 {
             return Err(AppError::Parse(format!(
@@ -365,6 +368,35 @@ mod tests {
         assert_eq!(stats.parsed_successfully, 2);
         assert_eq!(stats.parse_failures, 0);
         assert!(stats.failure_rate < 0.01);
+    }
+
+    #[test]
+    fn test_parse_line_with_invisible_unicode() {
+        // NOAA data files can contain invisible Unicode characters (BOM, zero-width spaces)
+        // that don't show up in logs but cause integer parsing to fail.
+        // This test verifies we strip them before parsing.
+        let line_with_bom = "\u{FEFF}03761 20260308 0400 20260307 2300  2.622  -75.79   39.86     8.2     8.5     8.8     8.1     0.0      0 0      0 0      0 0 C     7.8 0     8.0 0     7.4 0    96 0   0.377   0.378   0.359   0.365   0.322     5.1     4.2     4.0     3.5     3.3";
+
+        let result = Parser::parse_line(line_with_bom);
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+
+        let obs = result.unwrap();
+        assert_eq!(obs.wbanno, 3761);
+        assert_eq!(obs.t_hr_avg, Some(8.5));
+        assert_eq!(obs.soil_moisture_5, Some(0.377));
+        assert_eq!(obs.soil_temp_5, Some(5.1));
+    }
+
+    #[test]
+    fn test_parse_line_with_leading_zero_wbanno() {
+        // Station IDs like 03761 (Avondale, PA) have leading zeros
+        let line = "03761 20260308 0400 20260307 2300  2.622  -75.79   39.86     8.2     8.5     8.8     8.1     0.0      0 0      0 0      0 0 C     7.8 0     8.0 0     7.4 0    96 0   0.377   0.378   0.359   0.365   0.322     5.1     4.2     4.0     3.5     3.3";
+
+        let result = Parser::parse_line(line);
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+
+        let obs = result.unwrap();
+        assert_eq!(obs.wbanno, 3761);
     }
 
     #[test]
