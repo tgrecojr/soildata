@@ -21,7 +21,7 @@
 #
 # Expected final image size: 50-80MB (vs 200MB+ with debian:slim)
 
-FROM rust:slim AS chef
+FROM rust:slim@sha256:cf09adf8c3ebaba10779e5c23ff7fe4df4cccdab8a91f199b0c142c53fef3e1a AS chef
 
 WORKDIR /app
 
@@ -77,7 +77,7 @@ RUN cargo build --release && \
 
 # Runtime stage - using distroless for minimal size and attack surface
 # distroless/cc-debian12 includes glibc and SSL certificates but no shell/package manager
-FROM gcr.io/distroless/cc-debian12
+FROM gcr.io/distroless/cc-debian12@sha256:847433844c7e04bcf07a3a0f0f5a8de554c6df6fa9e3e3ab14d3f6b73d780235
 
 WORKDIR /app
 
