@@ -7,7 +7,7 @@ authors = ["tgrecojr"]
 
 [dependencies]
 tokio = { version = "1", features = ["full", "signal"] }
-reqwest = { version = "0.13", features = ["rustls-tls"] }
+reqwest = { version = "0.13", features = ["rustls", "webpki-roots"] }
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "macros", "migrate"] }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
