@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:4da1a4828be12604092fa55311276f08f9224a74a62dcb4708bd7439e2a03911
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-uscrn}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uscrn_password}
@@ -32,7 +32,7 @@ services:
       retries: 5
 
   grafana:
-    image: grafana/grafana:11.4.0
+    image: grafana/grafana:11.4.0@sha256:d8ea37798ccc41061a62ab080f2676dda6bf7815558499f901bdb0f533a456fb
     environment:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
