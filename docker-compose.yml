@@ -16,7 +16,7 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:18-alpine
+    image: postgres:18-alpine@sha256:4da1a4828be12604092fa55311276f08f9224a74a62dcb4708bd7439e2a03911
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-uscrn}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-uscrn_password}
