@@ -92,7 +92,7 @@ jobs:
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Rust-specific caching for cargo registry and git dependencies
       # Significantly speeds up cargo-chef and dependency compilation
