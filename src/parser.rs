@@ -116,9 +116,12 @@ impl Parser {
     }
 
     fn parse_line(line: &str) -> Result<NewObservation> {
-        // Strip invisible Unicode characters (BOM, zero-width spaces, etc.) that can
-        // appear in NOAA data files downloaded from external sources
-        let cleaned_line: String = line.chars().filter(|c| c.is_ascii()).collect();
+        // Strip non-ASCII (BOM, zero-width spaces) and ASCII control chars (NUL, DEL, etc.)
+        // that can appear in NOAA data files and aren't caught by split_whitespace.
+        let cleaned_line: String = line
+            .chars()
+            .filter(|c| c.is_ascii_graphic() || c.is_ascii_whitespace())
+            .collect();
         let fields: Vec<&str> = cleaned_line.split_whitespace().collect();
 
         if fields.len() < 28 {
@@ -220,8 +223,14 @@ impl Parser {
 }
 
 fn parse_int(s: &str) -> Result<i32> {
-    s.parse::<i32>()
-        .map_err(|e| AppError::Parse(format!("Failed to parse int '{}': {}", s, e)))
+    s.parse::<i32>().map_err(|e| {
+        AppError::Parse(format!(
+            "Failed to parse int '{}' (bytes: {:?}): {}",
+            s,
+            s.as_bytes(),
+            e
+        ))
+    })
 }
 
 fn parse_optional_int(s: Option<&str>) -> Option<i32> {
@@ -385,6 +394,20 @@ mod tests {
         assert_eq!(obs.t_hr_avg, Some(8.5));
         assert_eq!(obs.soil_moisture_5, Some(0.377));
         assert_eq!(obs.soil_temp_5, Some(5.1));
+    }
+
+    #[test]
+    fn test_parse_line_with_ascii_control_char() {
+        // NOAA files occasionally contain embedded ASCII control chars (e.g. NUL)
+        // that survive the non-ASCII filter and don't count as whitespace.
+        // The cleaner must strip them so wbanno still parses.
+        let line_with_nul = "03761\u{0}  20260308 0400 20260307 2300  2.622  -75.79   39.86     8.2     8.5     8.8     8.1     0.0      0 0      0 0      0 0 C     7.8 0     8.0 0     7.4 0    96 0   0.377   0.378   0.359   0.365   0.322     5.1     4.2     4.0     3.5     3.3";
+
+        let result = Parser::parse_line(line_with_nul);
+        assert!(result.is_ok(), "Parse error: {:?}", result.err());
+
+        let obs = result.unwrap();
+        assert_eq!(obs.wbanno, 3761);
     }
 
     #[test]
