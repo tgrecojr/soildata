@@ -21,7 +21,7 @@
 #
 # Expected final image size: 50-80MB (vs 200MB+ with debian:slim)
 
-FROM rust:slim-bookworm@sha256:caaf9ca7acd474892186860307d6f28e51fdbc1a4eada459fcff81517cf46a36 AS chef
+FROM rust:slim-bookworm@sha256:b8ecdb97c5b9c1ae058249f72710dbe33d4da19f7b8d911bd3c72e5f048af251 AS chef
 
 WORKDIR /app
 
