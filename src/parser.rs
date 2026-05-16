@@ -5,6 +5,10 @@ use tracing::warn;
 
 const MISSING_VALUE: f32 = -9999.0;
 const MISSING_VALUE_INT: i32 = -9999;
+// Soil moisture uses -99 (valid moisture range is 0.0..1.0, so -9999 would never appear)
+const MOISTURE_MISSING: f32 = -99.0;
+// Solar radiation uses -99999 (W/m^2)
+const SOLARAD_MISSING: f32 = -99999.0;
 
 /// Default failure threshold - fail if more than 10% of lines fail to parse
 const DEFAULT_FAILURE_THRESHOLD: f64 = 0.10;
@@ -150,11 +154,11 @@ impl Parser {
         let t_min = parse_optional_float(fields.get(11).copied());
         let p_calc = parse_optional_float(fields.get(12).copied());
 
-        let solarad = parse_optional_float(fields.get(13).copied());
+        let solarad = parse_optional_solarad(fields.get(13).copied());
         let solarad_flag = parse_optional_int(fields.get(14).copied());
-        let solarad_max = parse_optional_float(fields.get(15).copied());
+        let solarad_max = parse_optional_solarad(fields.get(15).copied());
         let solarad_max_flag = parse_optional_int(fields.get(16).copied());
-        let solarad_min = parse_optional_float(fields.get(17).copied());
+        let solarad_min = parse_optional_solarad(fields.get(17).copied());
         let solarad_min_flag = parse_optional_int(fields.get(18).copied());
 
         let sur_temp_type = fields.get(19).map(|s| s.to_string());
@@ -169,11 +173,11 @@ impl Parser {
         let rh_hr_avg_flag = parse_optional_int(fields.get(27).copied());
 
         // Soil moisture (5 depths)
-        let soil_moisture_5 = parse_optional_float(fields.get(28).copied());
-        let soil_moisture_10 = parse_optional_float(fields.get(29).copied());
-        let soil_moisture_20 = parse_optional_float(fields.get(30).copied());
-        let soil_moisture_50 = parse_optional_float(fields.get(31).copied());
-        let soil_moisture_100 = parse_optional_float(fields.get(32).copied());
+        let soil_moisture_5 = parse_optional_moisture(fields.get(28).copied());
+        let soil_moisture_10 = parse_optional_moisture(fields.get(29).copied());
+        let soil_moisture_20 = parse_optional_moisture(fields.get(30).copied());
+        let soil_moisture_50 = parse_optional_moisture(fields.get(31).copied());
+        let soil_moisture_100 = parse_optional_moisture(fields.get(32).copied());
 
         // Soil temperature (5 depths)
         let soil_temp_5 = parse_optional_float(fields.get(33).copied());
@@ -253,6 +257,24 @@ fn parse_optional_float(s: Option<&str>) -> Option<f32> {
             Some(val)
         }
     })
+}
+
+fn parse_optional_moisture(s: Option<&str>) -> Option<f32> {
+    let val = parse_optional_float(s)?;
+    if (val - MOISTURE_MISSING).abs() < 0.1 {
+        None
+    } else {
+        Some(val)
+    }
+}
+
+fn parse_optional_solarad(s: Option<&str>) -> Option<f32> {
+    let val = parse_optional_float(s)?;
+    if (val - SOLARAD_MISSING).abs() < 0.1 {
+        None
+    } else {
+        Some(val)
+    }
 }
 
 fn parse_datetime(date: i32, time: i32) -> Result<chrono::DateTime<Utc>> {
@@ -344,6 +366,56 @@ mod tests {
     fn test_parse_optional_float_valid() {
         assert_eq!(parse_optional_float(Some("25.5")), Some(25.5));
         assert_eq!(parse_optional_float(Some("0.0")), Some(0.0));
+    }
+
+    #[test]
+    fn test_parse_optional_moisture_missing() {
+        // Soil moisture uses -99 as the missing sentinel (valid range is 0..1)
+        assert_eq!(parse_optional_moisture(Some("-99.000")), None);
+        assert_eq!(parse_optional_moisture(Some("-99")), None);
+        // Standard -9999.0 sentinel is also treated as missing
+        assert_eq!(parse_optional_moisture(Some("-9999.0")), None);
+    }
+
+    #[test]
+    fn test_parse_optional_moisture_valid() {
+        assert_eq!(parse_optional_moisture(Some("0.377")), Some(0.377));
+        assert_eq!(parse_optional_moisture(Some("0.0")), Some(0.0));
+    }
+
+    #[test]
+    fn test_parse_optional_solarad_missing() {
+        // Solar radiation uses -99999 as the missing sentinel
+        assert_eq!(parse_optional_solarad(Some("-99999")), None);
+        assert_eq!(parse_optional_solarad(Some("-99999.0")), None);
+        // Standard -9999.0 sentinel is also treated as missing
+        assert_eq!(parse_optional_solarad(Some("-9999.0")), None);
+    }
+
+    #[test]
+    fn test_parse_optional_solarad_valid() {
+        assert_eq!(parse_optional_solarad(Some("424")), Some(424.0));
+        assert_eq!(parse_optional_solarad(Some("608")), Some(608.0));
+    }
+
+    #[test]
+    fn test_parse_line_with_offline_station_sentinels() {
+        // Real line from Avondale during the 2026-05-11 → 05-16 outage.
+        // Soil moisture is -99.000 and solar radiation is -99999; both must
+        // be parsed as None, not stored as -99 / -99999.
+        let line = "03761 20260515 1400 20260515 0900 -9.000  -75.79   39.86 -9999.0 -9999.0 -9999.0 -9999.0 -9999.0 -99999 0 -99999 0 -99999 0 U -9999.0 0 -9999.0 0 -9999.0 0 -9999 0 -99.000 -99.000 -99.000 -99.000 -99.000 -9999.0 -9999.0 -9999.0 -9999.0 -9999.0";
+
+        let obs = Parser::parse_line(line).unwrap();
+        assert_eq!(obs.solarad, None);
+        assert_eq!(obs.solarad_max, None);
+        assert_eq!(obs.solarad_min, None);
+        assert_eq!(obs.soil_moisture_5, None);
+        assert_eq!(obs.soil_moisture_10, None);
+        assert_eq!(obs.soil_moisture_20, None);
+        assert_eq!(obs.soil_moisture_50, None);
+        assert_eq!(obs.soil_moisture_100, None);
+        assert_eq!(obs.soil_temp_5, None);
+        assert_eq!(obs.t_hr_avg, None);
     }
 
     #[test]
