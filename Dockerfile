@@ -77,7 +77,7 @@ RUN cargo build --release && \
 
 # Runtime stage - using distroless for minimal size and attack surface
 # distroless/cc-debian12 includes glibc and SSL certificates but no shell/package manager
-FROM gcr.io/distroless/cc-debian12@sha256:847433844c7e04bcf07a3a0f0f5a8de554c6df6fa9e3e3ab14d3f6b73d780235
+FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1417ffc986ec9619bd0e1556b56
 
 WORKDIR /app
 
