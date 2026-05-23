@@ -1,0 +1,15 @@
+# osv-scanner configuration
+# Per https://google.github.io/osv-scanner/configuration/, this file applies
+# only to lockfiles in the same directory (Cargo.lock at repo root).
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2023-0071"
+ignoreUntil = 2026-11-23
+# rsa 0.9.10 (Marvin Attack timing side-channel) is pulled in transitively
+# only because the `sqlx` umbrella crate lists `sqlx-mysql` as an optional
+# dependency. This crate uses sqlx with the `postgres` feature only, so
+# `sqlx-mysql` and `rsa` are NOT compiled into the binary. Verified:
+# `cargo tree -i rsa` returns "nothing to print". The vulnerability requires
+# actually performing RSA decryption, which we never do.
+# Mirror is in /.cargo/audit.toml (cargo-audit).
+reason = "rsa is in Cargo.lock via sqlx-mysql optional dep but not compiled; postgres-only feature set"
