@@ -21,7 +21,7 @@
 #
 # Expected final image size: 50-80MB (vs 200MB+ with debian:slim)
 
-FROM rust:slim-bookworm@sha256:d7482085ff5b415f84dba5647ae71606650bdef00db7aeb69f4b3d170c3e4082 AS chef
+FROM rust:slim-trixie@sha256:e14e87345b4d5964ddcc3491d27ee046a0f23820f340c3c1e24da6880141f7c0 AS chef
 
 WORKDIR /app
 
@@ -76,8 +76,8 @@ RUN cargo build --release && \
     ls -lh /app/target/release/uscrn-ingest
 
 # Runtime stage - using distroless for minimal size and attack surface
-# distroless/cc-debian12 includes glibc and SSL certificates but no shell/package manager
-FROM gcr.io/distroless/cc-debian12@sha256:aa0b7af67fa8211751ea6e00baa8373ba56cc1417ffc986ec9619bd0e1556b56
+# distroless/cc-debian13 includes glibc and SSL certificates but no shell/package manager
+FROM gcr.io/distroless/cc-debian13@sha256:8b5d1db6d2253036a53cb8362d3e3fa82a7caf84c247772c46a023166c64e977
 
 WORKDIR /app
 
