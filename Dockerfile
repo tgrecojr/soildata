@@ -21,7 +21,7 @@
 #
 # Expected final image size: 50-80MB (vs 200MB+ with debian:slim)
 
-FROM rust:slim-trixie@sha256:e14e87345b4d5964ddcc3491d27ee046a0f23820f340c3c1e24da6880141f7c0 AS chef
+FROM rust:slim-trixie@sha256:26abcef3d79b8d890c4ceb17093154573e1f6479cf6dd7c1450043b8458350f6 AS chef
 
 WORKDIR /app
 
