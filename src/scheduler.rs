@@ -1,3 +1,4 @@
+use crate::bronze::Bronze;
 use crate::config::Config;
 use crate::db::models::{NewProcessedFile, NewStation};
 use crate::db::Repository;
@@ -14,6 +15,9 @@ pub struct Scheduler {
     config: Config,
     repository: Arc<Repository>,
     shutdown_rx: watch::Receiver<bool>,
+    /// Shared bronze sink, constructed once so its skip-if-identical cache
+    /// survives across the per-run `Fetcher` recreation.
+    bronze: Arc<Bronze>,
 }
 
 impl Scheduler {
@@ -26,6 +30,7 @@ impl Scheduler {
             config,
             repository,
             shutdown_rx,
+            bronze: Arc::new(Bronze::from_env()),
         }
     }
 
@@ -75,7 +80,7 @@ impl Scheduler {
     async fn run_ingestion(&self) -> Result<()> {
         info!("Starting ingestion run");
 
-        let fetcher = Fetcher::new(&self.config.source.base_url)?;
+        let fetcher = Fetcher::new(&self.config.source.base_url, self.bronze.clone())?;
         let years_to_process = self.config.source.years_to_fetch.get_years();
 
         info!("Processing years: {:?}", years_to_process);
@@ -182,8 +187,8 @@ impl Scheduler {
         fetcher: &Fetcher,
         file_info: &crate::fetcher::FileInfo,
     ) -> Result<usize> {
-        // Download file
-        let content = fetcher.download_file(&file_info.url).await?;
+        // Download file (raw bytes captured to bronze before parsing)
+        let content = fetcher.download_file(file_info).await?;
 
         // Parse observations
         let (mut observations, parse_stats) = Parser::parse_file(&content)?;

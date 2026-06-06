@@ -343,6 +343,33 @@ To use the dashboard in your own Grafana instance:
 2. In Grafana: Dashboards → Import → Upload JSON file
 3. Configure a PostgreSQL datasource pointing to your USCRN database
 
+## Bronze Layer (Raw Capture)
+
+The service can optionally preserve the **exact raw bytes** of every NOAA file it downloads to a local "bronze" layer, so raw data is captured once, immutably, and can be reprocessed later without re-fetching. This runs *alongside* the normal parsing and database insert — it never changes how data is parsed or stored.
+
+**Enable it** by setting the `BRONZE_ROOT` environment variable to a directory:
+
+```bash
+export BRONZE_ROOT=/data/bronze
+```
+
+If `BRONZE_ROOT` is unset or empty, capture is a complete no-op and the service behaves exactly as before (this is the default).
+
+**What you get** — for each downloaded file, two files are written:
+
+```
+/data/bronze/uscrn/pa_avondale_2_n/dt=2026-06-06/pa_avondale_2_n_1717459200000_a3f9c1.txt
+/data/bronze/uscrn/pa_avondale_2_n/dt=2026-06-06/pa_avondale_2_n_1717459200000_a3f9c1.txt.meta.json
+```
+
+- The `.txt` is the unmodified file content, byte-for-byte.
+- The `.meta.json` sidecar records provenance: request URL, HTTP status, content type/charset, arrival vs stored encoding, byte size, sha256, and processor version.
+
+**Notes**
+- NOAA appends hourly rows to each station-year file; the service always re-downloads the whole file, so each poll captures a full snapshot as a new, immutable object (partitioned by fetch date). A byte-identical re-fetch is skipped.
+- Writes are atomic and capture failures are non-fatal — a bronze problem never interrupts ingestion.
+- `BRONZE_ROOT` is the single swappable base location, leaving the path open to a future S3 backend.
+
 ## Database Schema
 
 The application creates three tables:

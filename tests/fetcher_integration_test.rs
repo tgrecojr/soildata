@@ -1,17 +1,36 @@
+use std::sync::Arc;
+use uscrn_ingest::bronze::Bronze;
 use uscrn_ingest::error::AppError;
-use uscrn_ingest::fetcher::Fetcher;
+use uscrn_ingest::fetcher::{Fetcher, FileInfo};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+
+/// Build a fetcher with bronze capture resolved from the environment
+/// (disabled unless BRONZE_ROOT is set, which it is not in tests).
+fn test_fetcher(base_url: &str) -> uscrn_ingest::error::Result<Fetcher> {
+    Fetcher::new(base_url, Arc::new(Bronze::from_env()))
+}
+
+/// Minimal `FileInfo` wrapping a raw URL, for exercising URL validation.
+fn file_info_for(url: &str) -> FileInfo {
+    FileInfo {
+        name: "test.txt".to_string(),
+        url: url.to_string(),
+        year: 2024,
+        state: "PA".to_string(),
+        station_name: "Avondale_2_N".to_string(),
+    }
+}
 
 /// Test that fetcher properly validates URLs against allowed hosts
 #[tokio::test]
 async fn test_fetcher_rejects_invalid_host() {
-    let fetcher = Fetcher::new("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/")
+    let fetcher = test_fetcher("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/")
         .expect("Failed to create fetcher");
 
     // Try to download from non-allowed host
     let result = fetcher
-        .download_file("https://evil.com/malicious.txt")
+        .download_file(&file_info_for("https://evil.com/malicious.txt"))
         .await;
 
     assert!(result.is_err());
@@ -26,12 +45,12 @@ async fn test_fetcher_rejects_invalid_host() {
 /// Test that fetcher rejects HTTP URLs (requires HTTPS)
 #[tokio::test]
 async fn test_fetcher_rejects_http_urls() {
-    let fetcher = Fetcher::new("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/")
+    let fetcher = test_fetcher("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/")
         .expect("Failed to create fetcher");
 
     // Try HTTP instead of HTTPS
     let result = fetcher
-        .download_file("http://www.ncei.noaa.gov/pub/data/file.txt")
+        .download_file(&file_info_for("http://www.ncei.noaa.gov/pub/data/file.txt"))
         .await;
 
     assert!(result.is_err());
@@ -62,7 +81,7 @@ async fn test_fetcher_downloads_file_successfully() {
     // We need to test the actual HTTP logic separately or mock the validation
 
     // For now, test that the fetcher construction works
-    let fetcher = Fetcher::new("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/");
+    let fetcher = test_fetcher("https://www.ncei.noaa.gov/pub/data/uscrn/products/hourly02/");
     assert!(fetcher.is_ok());
 }
 

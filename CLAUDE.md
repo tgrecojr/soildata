@@ -80,7 +80,7 @@ grafana/
 2. Fetcher lists available files from NOAA
 3. Filter by configured locations (states/stations/patterns)
 4. Skip already-processed files
-5. Download and parse file content
+5. Download file → **capture raw bytes to bronze (best-effort, before parsing)** → parse file content
 6. Upsert station metadata
 7. Insert observations with deduplication
 8. Mark file as processed
@@ -96,6 +96,7 @@ grafana/
 
 ### Optional Environment Variables
 - `RUST_LOG` — Logging level (default: info,uscrn_ingest=debug)
+- `BRONZE_ROOT` — Root directory for the bronze raw-capture layer (e.g. `/data/bronze`). **Disabled by default**: if unset or empty, bronze capture is a complete noop and the app behaves exactly as before. See [Bronze Layer](#bronze-layer-raw-capture).
 
 ### Docker Compose Only
 - `POSTGRES_USER` — Database user (for docker-compose)
@@ -153,6 +154,40 @@ locations:
   stations: [3761]
   patterns: ["*_Bodega_*"]
 ```
+
+## Bronze Layer (Raw Capture)
+
+The app optionally captures the **exact raw bytes** of each downloaded NOAA file to a local "bronze" layer, so raw data is preserved once, immutably, and can be reprocessed later without re-fetching. This is a side-effect added alongside the existing parsing/DB logic — it never alters how data is parsed or stored.
+
+### Enabling
+Set `BRONZE_ROOT` to a directory (e.g. `/data/bronze`). Unset or empty = complete noop (default). Capture is opt-in per environment.
+
+### What is captured
+- **Captured (data):** the per-station hourly data files from `download_file` — the actual climate records.
+- **Not captured (plumbing):** the NOAA directory-listing HTML used to discover years/files.
+- No secrets, tokens, or auth are involved in this source, so nothing is ever redacted.
+
+### How append-at-source maps to bronze
+NOAA appends a new hourly row to each station-year file in place. The app always re-downloads the **entire current-year file**, so every poll is a complete snapshot of the file at that moment. Each snapshot is written as a **new immutable bronze object** (partitioned by fetch date, never overwriting). Overlapping rows across snapshots are a silver-layer concern; the existing DB upsert already dedupes at runtime. To curb redundancy, a byte-identical re-fetch is **skipped** (compared against the last capture's sha256, cached in-process).
+
+### Layout
+```
+{BRONZE_ROOT}/uscrn/{station_slug}/dt={YYYY-MM-DD}/{station_slug}_{fetched_at_unix_ms}_{short_id}.txt
+```
+- `source` = `uscrn`; `collection` = per-station slug (e.g. `pa_avondale_2_n`).
+- Each payload has a `.meta.json` sidecar (provenance: request URL, HTTP status, content-type/charset, `content_encoding` arrival vs `stored_encoding` on disk, `byte_size`, `sha256`, processor/version, `schema_version`).
+- Stored form is plain text (`identity` encoding), so `ext` is `txt`.
+- Writes are atomic (temp file + rename). Capture failures are logged and **non-fatal**.
+
+### Implementation
+- `src/bronze.rs` — `Bronze` sink (`from_env`, skip-if-identical cache, atomic write), `CaptureMeta`, `slugify`.
+- `src/fetcher.rs` — `download_file` reads `response.bytes()`, captures to bronze, then decodes for the parser.
+- `src/scheduler.rs` — owns the shared `Arc<Bronze>` so the dedup cache persists across runs.
+
+### Deferred (not built yet)
+- Error-response body capture (non-2xx with content) — NOAA failures here carry no useful body.
+- At-rest compression and retention/cleanup — explicit non-goals for v1.
+- S3 backend — `BRONZE_ROOT` is the single swappable base location, kept S3-migration-friendly.
 
 ## Database Schema
 

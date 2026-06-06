@@ -1,9 +1,14 @@
+use crate::bronze::{slugify, Bronze, CaptureMeta};
 use crate::config::LocationFilter;
 use crate::error::{AppError, Result};
 use reqwest::Client;
 use scraper::{Html, Selector};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
+
+/// Bronze `source` segment for all USCRN captures.
+const BRONZE_SOURCE: &str = "uscrn";
 
 /// Allowed hostnames for NOAA data fetching (prevents SSRF attacks)
 const ALLOWED_HOSTS: &[&str] = &[
@@ -44,6 +49,7 @@ fn validate_url(url: &str) -> Result<()> {
 pub struct Fetcher {
     client: Client,
     base_url: String,
+    bronze: Arc<Bronze>,
 }
 
 #[derive(Debug, Clone)]
@@ -56,7 +62,7 @@ pub struct FileInfo {
 }
 
 impl Fetcher {
-    pub fn new(base_url: &str) -> Result<Self> {
+    pub fn new(base_url: &str, bronze: Arc<Bronze>) -> Result<Self> {
         let client = Client::builder()
             .user_agent("uscrn-ingest/0.1.0")
             .timeout(std::time::Duration::from_secs(60))
@@ -65,24 +71,31 @@ impl Fetcher {
         Ok(Self {
             client,
             base_url: base_url.trim_end_matches('/').to_string(),
+            bronze,
         })
     }
 
-    /// Download a file from a validated NOAA URL
+    /// Download a USCRN data file, capturing the raw bytes to the bronze layer
+    /// before decoding for the parser.
     ///
     /// # Arguments
-    /// * `url` - The URL to download from (must be from allowed NOAA hosts)
+    /// * `file_info` - The file to download (its `url` must be an allowed NOAA host)
     ///
     /// # Returns
-    /// The file content as a string
+    /// The file content as a decoded string, for the existing parser.
     ///
     /// # Errors
-    /// Returns error if URL validation fails or download fails
-    pub async fn download_file(&self, url: &str) -> Result<String> {
+    /// Returns error if URL validation fails or download fails. A bronze capture
+    /// failure is non-fatal and never surfaces here.
+    pub async fn download_file(&self, file_info: &FileInfo) -> Result<String> {
+        let url = &file_info.url;
         debug!("Downloading file from {}", url);
 
         // Validate URL before making request
         validate_url(url)?;
+
+        // collection = the per-station dataset, e.g. "pa_avondale_2_n".
+        let collection = slugify(&format!("{}_{}", file_info.state, file_info.station_name));
 
         retry_with_backoff(3, || async {
             let response = self.client.get(url).send().await?;
@@ -91,8 +104,40 @@ impl Fetcher {
                 return Err(AppError::Http(response.error_for_status().unwrap_err()));
             }
 
-            let content = response.text().await?;
-            Ok(content)
+            // Read response provenance from headers before consuming the body.
+            let http_status = response.status().as_u16();
+            let content_type = header_value(&response, reqwest::header::CONTENT_TYPE);
+            let charset = content_type.as_deref().and_then(charset_from_content_type);
+            // No `gzip` reqwest feature is enabled, so the server never gzips for
+            // transport; the body is delivered as-is (`identity`).
+            let content_encoding = header_value(&response, reqwest::header::CONTENT_ENCODING)
+                .unwrap_or_else(|| "identity".to_string());
+
+            // Capture the EXACT unparsed bytes, never a decoded string.
+            let bytes = response.bytes().await?;
+
+            // Bronze capture happens before processing and is best-effort:
+            // a failure here is logged inside `capture` and never propagates.
+            let meta = CaptureMeta {
+                request_url: url.clone(),
+                request_params: serde_json::json!({}),
+                http_status,
+                content_type,
+                charset,
+                content_encoding,
+                // Native format is plain text; reqwest delivered it undecompressed.
+                stored_encoding: "identity".to_string(),
+                ext: "txt".to_string(),
+                redacted_fields: vec![],
+            };
+            self.bronze
+                .capture(BRONZE_SOURCE, &collection, &bytes, &meta)
+                .await;
+
+            // Decode for the existing parser. NOAA data is ASCII/UTF-8 and the
+            // parser sanitizes per line, so lossy decoding is behavior-equivalent
+            // to the previous `response.text()`.
+            Ok(String::from_utf8_lossy(&bytes).into_owned())
         })
         .await
     }
@@ -223,6 +268,26 @@ where
             }
         }
     }
+}
+
+/// Read a response header as an owned `String`, if present and valid UTF-8.
+fn header_value(response: &reqwest::Response, name: reqwest::header::HeaderName) -> Option<String> {
+    response
+        .headers()
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+}
+
+/// Extract the `charset` parameter from a `Content-Type` value, lowercased.
+/// e.g. `text/plain; charset=UTF-8` -> `utf-8`.
+fn charset_from_content_type(content_type: &str) -> Option<String> {
+    content_type.split(';').find_map(|part| {
+        let part = part.trim();
+        part.strip_prefix("charset=")
+            .or_else(|| part.strip_prefix("charset ="))
+            .map(|c| c.trim().trim_matches('"').to_ascii_lowercase())
+    })
 }
 
 fn parse_filename(filename: &str, year: i32, base_url: &str) -> Option<FileInfo> {
