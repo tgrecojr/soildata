@@ -8,8 +8,13 @@ services:
       - DB_USER=${POSTGRES_USER:-uscrn}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-uscrn_password}
       - RUST_LOG=info,uscrn_ingest=debug
+      # Bronze raw-capture layer. Disabled by default: unset or empty = noop.
+      # Uncomment (and the volume below) to capture raw NOAA responses to disk.
+      # - BRONZE_ROOT=/data/bronze
     volumes:
       - ./config:/app/config:ro
+      # Bronze capture target — pair with BRONZE_ROOT above.
+      # - ./bronze:/data/bronze
     depends_on:
       db:
         condition: service_healthy
