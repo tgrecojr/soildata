@@ -573,4 +573,4 @@ docker-compose exec -T db psql -U uscrn uscrn < backup.sql
 
 ## License
 
-MIT
+Released under the [MIT License](LICENSE).
